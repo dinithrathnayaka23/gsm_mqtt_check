@@ -18,14 +18,14 @@ const PORT = process.env.PORT || 4000;
 // ✅ WebSocket Server via Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: '*', // ✅ Replace with your Firebase URL for production
-    methods: ['GET', 'POST']
+    origin: '*', // 🔒 Replace with Firebase frontend URL for production
+    methods: ['GET', 'POST'],
   }
 });
 
 // ✅ Connect to MQTT broker
 const mqttClient = mqtt.connect(mqttUrl, {
-  clientId: `mqtt-web-${Math.random().toString(16).slice(2, 10)}`
+  clientId: `mqtt-web-${Math.random().toString(16).slice(2, 10)}`,
 });
 
 mqttClient.on('connect', () => {
@@ -33,49 +33,49 @@ mqttClient.on('connect', () => {
 
   mqttClient.subscribe([tempTopic, humidityTopic], (err) => {
     if (err) {
-      console.error('❌ Subscribe error:', err);
+      console.error('❌ Error subscribing to topics:', err);
     } else {
-      console.log(`📡 Subscribed to: ${tempTopic}, ${humidityTopic}`);
+      console.log(`📡 Subscribed to topics: [${tempTopic}, ${humidityTopic}]`);
     }
   });
 });
 
-// ✅ MQTT incoming messages → emit to frontend via WebSocket
+// ✅ MQTT → WebSocket Bridge
 mqttClient.on('message', (topic, message) => {
-  const value = message.toString();
+  const value = message.toString().trim(); // Trim whitespace
   const payload = { topic, value };
 
-  console.log(`📨 MQTT: ${topic} = ${value}`);
-  console.log('📤 Emitting mqttData to clients:', payload);
+  console.log(`📨 MQTT Message Received → ${topic}: ${value}`);
+  console.log('📤 Broadcasting to clients → mqttData:', payload);
 
-  io.emit('mqttData', payload); // 🔥 Main bridge line
+  io.emit('mqttData', payload); // 🔥 Main WebSocket emit
 });
 
-// ✅ Debug MQTT lifecycle
-mqttClient.on('error', (err) => console.error('❌ MQTT error:', err));
-mqttClient.on('offline', () => console.log('📴 MQTT offline'));
-mqttClient.on('reconnect', () => console.log('🔄 MQTT reconnecting'));
+// ✅ Handle MQTT lifecycle events
+mqttClient.on('error', err => console.error('❌ MQTT error:', err));
+mqttClient.on('offline', () => console.log('📴 MQTT client offline'));
+mqttClient.on('reconnect', () => console.log('🔄 Reconnecting to MQTT broker'));
 
-// ✅ Socket.IO client connection
+// ✅ WebSocket Client Events
 io.on('connection', (socket) => {
-  console.log('🟢 WebSocket client connected:', socket.id);
+  console.log(`🟢 WebSocket client connected: ${socket.id}`);
 
-  // ✅ TEMP TEST: emit fake temperature after connect
+  // ✅ Optional: send a test value for debug
   setTimeout(() => {
-    const fakePayload = {
+    const testPayload = {
       topic: 'esp32/temperature',
       value: '26.3'
     };
-    console.log('🧪 Sending fake MQTT data to client:', fakePayload);
-    socket.emit('mqttData', fakePayload);
+    console.log('🧪 Sending test MQTT data to frontend:', testPayload);
+    socket.emit('mqttData', testPayload);
   }, 2000);
 
   socket.on('disconnect', () => {
-    console.log('🔴 WebSocket client disconnected:', socket.id);
+    console.log(`🔴 WebSocket client disconnected: ${socket.id}`);
   });
 });
 
-// ✅ Start backend server
+// ✅ Start server
 server.listen(PORT, () => {
-  console.log(`🚀 MQTT-WebSocket bridge running on port ${PORT}`);
+  console.log(`🚀 MQTT-WebSocket bridge running at http://localhost:${PORT}`);
 });
